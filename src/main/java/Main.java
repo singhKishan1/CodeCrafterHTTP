@@ -1,13 +1,38 @@
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 
 public class Main {
 
+  public static boolean readPathOfHTTPRequest(BufferedReader bufferedReader)
+      throws IOException {
+    String requestLine = bufferedReader.readLine();
+    if (requestLine != null && !requestLine.isEmpty()) {
+      System.out.println("RequestedLine ==> " + requestLine);
+
+      String[] requestParts = requestLine.split(" ");
+      if (!requestParts[1].equals("/")) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   public static void sendResponseToServer(Socket socket) throws IOException {
     PrintWriter printWriter = new PrintWriter(socket.getOutputStream());
-    StringBuilder msg = new StringBuilder("HTTP/1.1 200 OK\r\n\r\n");
+    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+    StringBuilder msg;
+    if (readPathOfHTTPRequest(bufferedReader)) {
+      msg = new StringBuilder("HTTP/1.1 200 OK\r\n\r\n");
+    } else {
+      msg = new StringBuilder("HTTP/1.1 404 Not Found\r\n\r\n");
+    }
+
     printWriter.write(msg.toString());
     printWriter.flush();
     printWriter.close();
