@@ -15,11 +15,12 @@ public class Main {
 
       String[] requestParts = requestLine.split(" ");
       String response;
+
       if (requestParts[1].contains("echo")) {
-        String message = requestParts[1].split("/")[1];
+        String message = requestParts[1].split("/")[2];
         response = String.format("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
             message.length(), message);
-      } else if (!requestParts[1].contains("/")) {
+      } else if (requestParts[1].length() > 1) {
         response = "HTTP/1.1 404 Not Found\r\n\r\n";
       } else {
         response = "HTTP/1.1 200 OK\r\n\r\n";
