@@ -1,13 +1,17 @@
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.HashSet;
+import java.util.Set;
 
 public class Main {
+
+  private static String directory;
 
   public static void readPathOfHTTPRequest(BufferedReader bufferedReader, PrintWriter printWriter)
       throws IOException {
@@ -50,7 +54,33 @@ public class Main {
         System.out.println("Processing Path Request ==> " + requestPath);
 
         String response;
-        if (requestPath.contains("/echo/")) {
+        if (requestPath.contains("/files/")) {
+          // extract the file after "/files/"
+          String fileName = requestPath.split("/")[2];
+          if (directory != null && fileName != null) {
+            File file = new File(directory, fileName);
+
+            FileInputStream fis = new FileInputStream(file);
+
+            // Create a byte array to hold the file data
+            byte[] fileBytes = new byte[(int) file.length()];
+
+            System.out.println("Directory  ==> " + directory + " directoyr length == " + directory.length());
+            System.out.println("FileName ======>>>>" + fileName + " filelength == " + fileBytes.length);
+            String fileContent = new String(fileBytes);
+            System.out.println("File content ===> " + fileContent);
+            if (file.exists()) {
+              response = String.format(
+                  "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s",
+                  fileBytes.length,
+                  fileContent);
+            } else {
+              response = "HTTP/1.1 404 Not Found\r\n\r\n";
+            }
+          } else {
+            response = "HTTP/1.1 404 Not Found\r\n\r\n";
+          }
+        } else if (requestPath.contains("/echo/")) {
           // Extract the message after "/echo/"
           String message = requestPath.split("/")[2];
           System.out.println("Message from path: " + message);
@@ -86,6 +116,18 @@ public class Main {
     // You can use print statements as follows for debugging, they'll be visible
     // when running tests.
     System.out.println("Logs from your program will appear here!");
+
+    // fetching directory
+    if (args.length > 1) {
+      File tempdirectory = new File(args[1]);
+      if (!tempdirectory.exists()) {
+        tempdirectory.mkdirs();
+        System.out.println("Directory created");
+      } else {
+        System.out.println("Directory existed....");
+      }
+      directory = args[1];
+    }
 
     // Uncomment this block to pass the first stage
 
