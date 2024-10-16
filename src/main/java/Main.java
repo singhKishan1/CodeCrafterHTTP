@@ -60,24 +60,24 @@ public class Main {
           if (directory != null && fileName != null) {
             File file = new File(directory, fileName);
 
-            FileInputStream fis = new FileInputStream(file);
-
-            // Create a byte array to hold the file data
-            byte[] fileBytes = new byte[(int) file.length()];
-
-            System.out.println("Directory  ==> " + directory + " directoyr length == " + directory.length());
-            System.out.println("FileName ======>>>>" + fileName + " filelength == " + fileBytes.length);
-            String fileContent = new String(fileBytes);
-            System.out.println("File content ===> " + fileContent);
             if (file.exists()) {
+              FileInputStream fis = new FileInputStream(file);
+
+              // Create a byte array to hold the file data
+              byte[] fileBytes = new byte[(int) file.length()];
+              // Read file into byte array
+              int bytesRead = fis.read(fileBytes);
+
+              String fileContent = new String(fileBytes);
               response = String.format(
                   "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s",
-                  fileBytes.length,
+                  bytesRead,
                   fileContent);
             } else {
               response = "HTTP/1.1 404 Not Found\r\n\r\n";
             }
           } else {
+
             response = "HTTP/1.1 404 Not Found\r\n\r\n";
           }
         } else if (requestPath.contains("/echo/")) {
