@@ -108,21 +108,7 @@ public class Main {
         }
       } else if (requestPath.contains("/echo/")) {
         // Extract the message after "/echo/"
-        String content = requestPath.split("/")[2];
-        System.out.println("Content from path: " + content);
-
-        System.out.println("accept encoding --> " + acceptEncoding);
-
-        if (acceptEncoding != null && !acceptEncoding.contains("invalid-encoding")) {
-          response = String.format(
-              "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n%s",
-              content.length(), content);
-
-        } else {
-          response = String.format(
-              "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
-              content.length(), content);
-        }
+        response = readEchoInHttp(requestPath, acceptEncoding);
         printWriter.write(response);
         printWriter.flush();
       } else if (userAgent != null && !userAgent.isEmpty()) {
@@ -148,6 +134,32 @@ public class Main {
     }
     // Close the PrintWriter once all processing is done
     printWriter.close();
+  }
+
+  public static String readEchoInHttp(String requestPath, String acceptEncoding) {
+
+    String content = requestPath.split("/")[2];
+    System.out.println("Content from path: " + content);
+
+    System.out.println("accept encoding --> " + acceptEncoding);
+
+    String[] accpEncodingContent = new String[0];
+    if (acceptEncoding != null) {
+      accpEncodingContent = acceptEncoding.split(" ");
+    }
+
+    StringBuilder response = new StringBuilder("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n");
+    if (accpEncodingContent.length > 0) {
+      for (int i = 1; i < accpEncodingContent.length; ++i) {
+        if (!accpEncodingContent[i].contains("encoding")) {
+          response.append("Content-Encoding: gzip\r\n");
+        }
+      }
+    }
+
+    response.append("Content-Length: " + content.length() + "\r\n\r\n" + content);
+
+    return response.toString();
   }
 
   public static void sendResponseToServer(Socket socket) throws IOException {
