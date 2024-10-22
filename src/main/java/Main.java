@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -7,6 +8,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.zip.GZIPOutputStream;
 
 public class Main {
 
@@ -28,11 +30,14 @@ public class Main {
       String line;
       String userAgent = null;
       int contentLength = 0;
+      String acceptEncoding = null;
       while ((line = bufferedReader.readLine()) != null && !line.isEmpty()) {
         if (line.startsWith("User-Agent")) {
           userAgent = line;
         } else if (line.startsWith("Content-Length:")) {
           contentLength = Integer.parseInt(line.split(":")[1].trim());
+        } else if (line.startsWith("Accept-Encoding")) {
+          acceptEncoding = line;
         }
       }
 
@@ -103,11 +108,21 @@ public class Main {
         }
       } else if (requestPath.contains("/echo/")) {
         // Extract the message after "/echo/"
-        String message = requestPath.split("/")[2];
-        System.out.println("Message from path: " + message);
-        response = String.format(
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
-            message.length(), message);
+        String content = requestPath.split("/")[2];
+        System.out.println("Content from path: " + content);
+
+        System.out.println("accept encoding --> " + acceptEncoding);
+
+        if (acceptEncoding != null && !acceptEncoding.contains("invalid-encoding")) {
+          response = String.format(
+              "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n%s",
+              content.length(), content);
+
+        } else {
+          response = String.format(
+              "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
+              content.length(), content);
+        }
         printWriter.write(response);
         printWriter.flush();
       } else if (userAgent != null && !userAgent.isEmpty()) {
