@@ -1,11 +1,4 @@
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.zip.GZIPOutputStream;
@@ -14,7 +7,7 @@ public class Main {
 
   private static String directory;
 
-  public static void readPathOfHTTPRequest(BufferedReader bufferedReader, PrintWriter printWriter)
+  public static void readPathOfHTTPRequest(BufferedReader bufferedReader, PrintWriter printWriter, Socket socket)
       throws IOException {
     // Read the first line, which is the request line (e.g., "GET /path HTTP/1.1")
     String requestLine = bufferedReader.readLine();
@@ -31,13 +24,15 @@ public class Main {
       String userAgent = null;
       int contentLength = 0;
       String acceptEncoding = null;
+
       while ((line = bufferedReader.readLine()) != null && !line.isEmpty()) {
+        System.out.println("Line --> " + line);
         if (line.startsWith("User-Agent")) {
           userAgent = line;
         } else if (line.startsWith("Content-Length:")) {
           contentLength = Integer.parseInt(line.split(":")[1].trim());
         } else if (line.startsWith("Accept-Encoding")) {
-          acceptEncoding = line;
+          acceptEncoding = line.split(":")[1].trim();
         }
       }
 
@@ -46,87 +41,80 @@ public class Main {
 
       String response;
       if (requestPath.contains("/files/")) {
-        // extract the file after "/files/"
+        // Handle file operations...
+        // (Code for handling file writing or reading should be here)
+        // Read the body of the POST request based on Content-Length
         String fileName = requestPath.split("/")[2];
-        if (directory != null && fileName != null) {
-          if ("POST".equals(httpMethod)) {
-            // Read the body of the POST request based on Content-Length
-            char[] bodyContent = new char[contentLength];
-            bufferedReader.read(bodyContent, 0, contentLength); // Read exactly Content-Length chars
-            String fileContent = new String(bodyContent).trim();
+        if (requestLine.contains("POST")) {
 
-            System.out.println("FileName ===> " + fileName);
-            System.out.println("Content ===> " + fileContent);
-
-            // Create and write to the file
-            File dir = new File(directory);
-            if (!dir.exists()) {
-              dir.mkdirs(); // Creates the directory and all non-existent parent directories
-              System.out.println("Directory created: " + dir.getAbsolutePath());
-            }
-
-            try (FileWriter writer = new FileWriter(directory + File.separator + fileName)) {
-              writer.write(fileContent);
-              System.out.println("File created and content written.");
-            } catch (IOException e) {
-              e.printStackTrace();
-              printWriter.write("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n");
-              printWriter.flush();
-              return;
-            }
-
-            // Send the HTTP 201 Created response
-            String response1 = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
-            printWriter.write(response1);
-            printWriter.flush(); // Ensure the response is flushed
-            System.out.println("HTTP response sent.");
-          } else {
-            // Handle non-POST requests for /files/
-            File file = new File(directory, fileName);
-            if (file.exists()) {
-              FileInputStream fis = new FileInputStream(file);
-              byte[] fileBytes = new byte[(int) file.length()];
-              int bytesRead = fis.read(fileBytes);
-              fis.close();
-
-              String fileContent = new String(fileBytes);
-              response = String.format(
-                  "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s",
-                  bytesRead, fileContent);
-              printWriter.write(response);
-              printWriter.flush();
-            } else {
-              response = "HTTP/1.1 404 Not Found\r\n\r\n";
-              printWriter.write(response);
-              printWriter.flush();
-            }
+          char[] bodyContent = new char[contentLength];
+          bufferedReader.read(
+              bodyContent, 0,
+              contentLength); // Read exactly Content-Length chars
+          String fileContent = new String(bodyContent).trim();
+          System.out.println("FileName ===> " + fileName);
+          System.out.println("Content ===> " + fileContent);
+          // Create and write to the file
+          File dir = new File(directory);
+          if (!dir.exists()) {
+            dir.mkdirs(); // Creates the directory and all non-existent parent
+                          // directories
+            System.out.println("Directory created: " + dir.getAbsolutePath());
           }
+          try (FileWriter writer = new FileWriter(directory + File.separator + fileName)) {
+            writer.write(fileContent);
+            System.out.println("File created and content written.");
+          } catch (IOException e) {
+            e.printStackTrace();
+            printWriter.write(
+                "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n");
+            printWriter.flush();
+            return;
+          }
+          // Send the HTTP 201 Created response
+          String response1 = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
+          printWriter.write(response1);
+          printWriter.flush(); // Ensure the response is flushed
+          System.out.println("HTTP response sent.");
         } else {
-          response = "HTTP/1.1 404 Not Found\r\n\r\n";
-          printWriter.write(response);
-          printWriter.flush();
+          // Handle non-POST requests for /files/
+          File file = new File(directory, fileName);
+          if (file.exists()) {
+            FileInputStream fis = new FileInputStream(file);
+            byte[] fileBytes = new byte[(int) file.length()];
+            int bytesRead = fis.read(fileBytes);
+            fis.close();
+            String fileContent = new String(fileBytes);
+            response = String.format(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s",
+                bytesRead, fileContent);
+            printWriter.write(response);
+            printWriter.flush();
+          } else {
+            response = "HTTP/1.1 404 Not Found\r\n\r\n";
+            printWriter.write(response);
+            printWriter.flush();
+          }
         }
       } else if (requestPath.contains("/echo/")) {
         // Extract the message after "/echo/"
-        response = readEchoInHttp(requestPath, acceptEncoding);
-        printWriter.write(response);
-        printWriter.flush();
+        sendResponse(socket, requestPath, acceptEncoding);
       } else if (userAgent != null && !userAgent.isEmpty()) {
-        System.out.println("User Agent: ---> " + userAgent);
+        // Process user-agent related response
         String message = userAgent.split(" ")[1];
-        System.out.println("Content --> " + message);
         String response1 = String.format(
             "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
             message.length(), message);
         printWriter.write(response1);
         printWriter.flush();
       } else if (requestPath.length() > 1) {
-        // If path is non-root and not "/echo", return 404 Not Found
+        // Handle 404 Not Found for unknown paths
         response = "HTTP/1.1 404 Not Found\r\n\r\n";
         printWriter.write(response);
         printWriter.flush();
       } else {
-        // If root path ("/"), return 200 OK with no content
+        // Handle root path request
+        System.out.println("root request -->");
         response = "HTTP/1.1 200 OK\r\n\r\n";
         printWriter.write(response);
         printWriter.flush();
@@ -136,42 +124,59 @@ public class Main {
     printWriter.close();
   }
 
-  public static String readEchoInHttp(String requestPath, String acceptEncoding) {
-
+  public static void sendResponse(Socket socket, String requestPath, String acceptEncoding) throws IOException {
+    PrintWriter writer = new PrintWriter(socket.getOutputStream());
     String content = requestPath.split("/")[2];
-    System.out.println("Content from path: " + content);
+    System.out.println("Send repone---> ");
 
-    System.out.println("accept encoding --> " + acceptEncoding);
+    boolean isGzipAccepted = acceptEncoding != null && acceptEncoding.contains("gzip");
+    if (isGzipAccepted) {
+      byte[] compressedContent = compressContent(content);
 
-    String[] accpEncodingContent = new String[0];
-    if (acceptEncoding != null) {
-      accpEncodingContent = acceptEncoding.split(" ");
+      // Write the headers
+      String headers = "HTTP/1.1 200 OK\r\n" +
+          "Content-Encoding: gzip\r\n" +
+          "Content-Type: text/plain\r\n" +
+          "Content-Length: " + compressedContent.length + "\r\n\r\n";
+      writer.write(headers);
+      writer.flush(); // Ensure headers are sent
+
+      // Send the compressed binary data
+      socket.getOutputStream().write(compressedContent);
+      socket.getOutputStream().flush();
+    } else {
+      // Plain text response without compression
+      String response = "HTTP/1.1 200 OK\r\n" +
+          "Content-Type: text/plain\r\n" +
+          "Content-Length: " + content.length() + "\r\n\r\n" +
+          content;
+      writer.write(response);
+      writer.flush();
     }
 
-    StringBuilder response = new StringBuilder("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n");
-    if (accpEncodingContent.length > 0) {
-      for (int i = 1; i < accpEncodingContent.length; ++i) {
-        if (!accpEncodingContent[i].contains("encoding")) {
-          response.append("Content-Encoding: gzip\r\n");
-        }
-      }
-    }
+    // Close the socket after sending the response
+    socket.close();
+  }
 
-    response.append("Content-Length: " + content.length() + "\r\n\r\n" + content);
+  // Compress the content and return the byte array
+  public static byte[] compressContent(String content) throws IOException {
+    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+    GZIPOutputStream gzipOutputStream = new GZIPOutputStream(byteArrayOutputStream);
+    gzipOutputStream.write(content.getBytes());
+    gzipOutputStream.finish(); // Ensure all content is written and compressed
+    gzipOutputStream.close(); // Close the GZIP stream
 
-    return response.toString();
+    // Return compressed byte array
+    return byteArrayOutputStream.toByteArray();
   }
 
   public static void sendResponseToServer(Socket socket) throws IOException {
     PrintWriter printWriter = new PrintWriter(socket.getOutputStream());
     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-    readPathOfHTTPRequest(bufferedReader, printWriter);
-
+    readPathOfHTTPRequest(bufferedReader, printWriter, socket);
   }
 
   public static void main(String[] args) {
-    // You can use print statements as follows for debugging, they'll be visible
-    // when running tests.
     System.out.println("Logs from your program will appear here!");
 
     // fetching directory
@@ -187,12 +192,8 @@ public class Main {
     }
 
     // Uncomment this block to pass the first stage
-
     try {
       ServerSocket serverSocket = new ServerSocket(4221);
-
-      // Since the tester restarts your program quite often, setting SO_REUSEADDR
-      // ensures that we don't run into 'Address already in use' errors
       serverSocket.setReuseAddress(true);
 
       while (true) {
